@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  codebase-qa:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    # Overwrite the stream command safely considering hot reloads
+    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
