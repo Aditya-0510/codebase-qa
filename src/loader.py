@@ -3,7 +3,7 @@ import urllib.request
 import zipfile
 import io
 
-SUPPORTED_EXTENSIONS = {'.py', '.js', '.ts', '.java', '.cpp'}
+SUPPORTED_EXTENSIONS = {'.py', '.js', '.ts', '.java', '.cpp', '.md', '.txt', '.json'}
 
 def load_codebase(directory_path: str):
     """

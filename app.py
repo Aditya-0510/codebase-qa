@@ -13,11 +13,38 @@ load_dotenv()
 
 st.set_page_config(page_title="Codebase Q&A MVP", layout="wide")
 
+st.markdown("""
+<style>
+/* Premium Dark Mode & Aesthetics */
+.stApp {
+    background-color: #0d1117;
+    color: #c9d1d9;
+}
+section[data-testid="stSidebar"] {
+    background-color: #161b22;
+    border-right: 1px solid #30363d;
+}
+.stExpander {
+    background-color: #161b22;
+    border: 1px solid #30363d !important;
+    border-radius: 8px !important;
+}
+.stTextInput input {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🚀 Codebase Q&A Assistant (RAG)")
 
-# Initialize session state for DB
+# Initialize session states
 if "vectordb" not in st.session_state:
     st.session_state["vectordb"] = None
+    
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
     
 with st.sidebar:
     st.header("Configuration")
@@ -42,8 +69,14 @@ with st.sidebar:
                     
                     try:
                         import shutil
+                        import stat
+                        
+                        def remove_readonly(func, path, _):
+                            os.chmod(path, stat.S_IWRITE)
+                            func(path)
+                            
                         if os.path.exists(target_dir):
-                            shutil.rmtree(target_dir) # Remove old if exists
+                            shutil.rmtree(target_dir, onerror=remove_readonly) # Remove old if exists
                             
                         subprocess.run(["git", "clone", codebase_input, target_dir], check=True, capture_output=True)
                         actual_path = target_dir
@@ -74,39 +107,35 @@ with st.sidebar:
                 st.warning("No code files found in the specified directory.")
 
 # Main Query Area
-query = st.text_input("Ask a question about the codebase:")
+for msg in st.session_state["messages"]:
+    st.chat_message(msg["role"]).write(msg["content"])
 
-if st.button("Submit Query"):
+if query := st.chat_input("Ask a question about the codebase:"):
     if not st.session_state["vectordb"]:
         st.warning("Please ingest a codebase first.")
-    elif not query:
-        st.warning("Please enter a query.")
     elif not os.getenv("GOOGLE_API_KEY"):
         st.error("GOOGLE_API_KEY environment variable is not set. Please add it to the .env file.")
     else:
-        with st.spinner("Retrieving context and generating answer..."):
-            # 1. Retrieve
-            db: VectorStoreDB = st.session_state["vectordb"]
-            try:
-                results = db.search(query, top_k=4)
-                
-                # Context list from Results (Tuple of Document, Score)
-                context_chunks = [res[0] for res in results]
-                
-                # 2. Generate
-                answer = get_answer(query, context_chunks)
-                
-                # 3. Display Results
-                st.markdown("### 🤖 Generated Answer")
-                st.info(answer)
-                
-                # 4. Explainability Layer
-                st.markdown("### 🔍 Explainability Layer (Retrieved Context)")
-                for i, (doc, score) in enumerate(results):
-                    file_path = doc.metadata.get('file_path', 'N/A')
-                    # FAISS returns L2 distance here by default if used with HF embeddings. Lower is better.
-                    with st.expander(f"Snippet {i+1}: {file_path} (Distance Score: {score:.4f})"):
-                        st.markdown(f"**Source File:** `{file_path}`")
-                        st.code(doc.page_content, language="python")
-            except Exception as e:
-                st.error(f"An error occurred during query generation: {e}")
+        st.session_state["messages"].append({"role": "user", "content": query})
+        st.chat_message("user").write(query)
+        
+        with st.chat_message("assistant"):
+            with st.spinner("Retrieving context and generating answer..."):
+                db: VectorStoreDB = st.session_state["vectordb"]
+                try:
+                    results = db.search(query, top_k=4)
+                    context_chunks = [res[0] for res in results]
+                    
+                    answer = get_answer(query, context_chunks, st.session_state["messages"])
+                    st.write(answer)
+                    
+                    st.session_state["messages"].append({"role": "assistant", "content": answer})
+                    
+                    with st.expander("🔍 View Retrieved Context"):
+                        for i, (doc, score) in enumerate(results):
+                            file_path = doc.metadata.get('file_path', 'N/A')
+                            st.markdown(f"**Snippet {i+1} from `{file_path}` (Distance: {score:.4f})**")
+                            st.code(doc.page_content, language="python")
+                            
+                except Exception as e:
+                    st.error(f"An error occurred during query generation: {e}")
