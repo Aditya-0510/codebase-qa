@@ -3,7 +3,7 @@ import urllib.request
 import zipfile
 import io
 
-SUPPORTED_EXTENSIONS = {'.py', '.js', '.ts', '.java', '.cpp', '.md', '.txt', '.json'}
+SUPPORTED_EXTENSIONS = {'.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.md', '.txt', '.json'}
 
 def load_codebase(directory_path: str):
     """
@@ -19,6 +19,7 @@ def load_codebase(directory_path: str):
             ext = os.path.splitext(file)[1].lower()
             if ext in SUPPORTED_EXTENSIONS:
                 file_path = os.path.join(root, file)
+                rel_path = os.path.relpath(file_path, directory_path)
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         text = f.read()
@@ -26,7 +27,7 @@ def load_codebase(directory_path: str):
                     documents.append({
                         "text": text,
                         "metadata": {
-                            "file_path": file_path,
+                            "file_path": rel_path,
                             "file_name": file
                         }
                     })
