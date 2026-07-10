@@ -17,6 +17,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+GOOGLE_API_KEY = st.secrets.get(
+    "GOOGLE_API_KEY",
+    os.getenv("GOOGLE_API_KEY")
+)
+
+if GOOGLE_API_KEY:
+    os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap');
@@ -625,7 +633,7 @@ if query := st.chat_input(
     disabled=not is_ready,
 ):
     if not os.getenv("GOOGLE_API_KEY"):
-        st.error("GOOGLE_API_KEY is not set. Add it to your .env file.")
+        st.error("GOOGLE_API_KEY is missing.")
     else:
         st.session_state["messages"].append({"role": "user", "content": query})
         with st.chat_message("user"):
